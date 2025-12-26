@@ -9,11 +9,13 @@ import {
   Settings,
   HelpCircle,
   LogOut,
+  Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", to: "/" },
+  { icon: Smartphone, label: "WhatsApp", to: "/whatsapp" },
   { icon: Users, label: "CRM", to: "/crm" },
   { icon: MessageSquare, label: "Mensagens", to: "/messages" },
   { icon: Workflow, label: "Automações", to: "/automations" },

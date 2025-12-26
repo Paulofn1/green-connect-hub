@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import CRM from "./pages/CRM";
+import WhatsAppConnection from "./pages/WhatsAppConnection";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -17,6 +18,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/whatsapp" element={<WhatsAppConnection />} />
           <Route path="/crm" element={<CRM />} />
           <Route path="/messages" element={<Dashboard />} />
           <Route path="/automations" element={<Dashboard />} />
