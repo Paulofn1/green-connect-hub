@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Check, Loader2, X, AlertTriangle, QrCode } from "lucide-react";
+import { Check, Loader2, X, AlertTriangle, QrCode, WifiOff, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { WhatsAppAccount, ConnectionStatus } from "@/types/whatsapp";
@@ -10,6 +10,8 @@ interface WhatsAppConnectionPanelProps {
   onConnect: () => void;
   onDisconnect: () => void;
   isLoading: boolean;
+  isSocketConnected?: boolean;
+  error?: string | null;
 }
 
 const statusConfig: Record<
@@ -31,6 +33,16 @@ const statusConfig: Record<
     color: "text-warning",
     icon: <Loader2 className="w-4 h-4 animate-spin" />,
   },
+  qr_ready: {
+    label: "QR Code pronto",
+    color: "text-primary",
+    icon: <QrCode className="w-4 h-4" />,
+  },
+  authenticating: {
+    label: "Autenticando...",
+    color: "text-warning",
+    icon: <Loader2 className="w-4 h-4 animate-spin" />,
+  },
   expired: {
     label: "Sessão expirada",
     color: "text-destructive",
@@ -44,6 +56,8 @@ export function WhatsAppConnectionPanel({
   onConnect,
   onDisconnect,
   isLoading,
+  isSocketConnected = true,
+  error,
 }: WhatsAppConnectionPanelProps) {
   if (!account) {
     return (
@@ -61,9 +75,38 @@ export function WhatsAppConnectionPanel({
   }
 
   const status = statusConfig[account.status];
+  const showQR = account.status === 'qr_ready' || account.status === 'connecting';
+  const canConnect = account.status === 'disconnected' || account.status === 'expired';
+  const canDisconnect = account.status !== 'disconnected';
 
   return (
     <div className="flex-1 p-8 bg-background/50">
+      {/* Socket connection warning */}
+      {!isSocketConnected && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center gap-2"
+        >
+          <WifiOff className="w-4 h-4 text-destructive" />
+          <span className="text-sm text-destructive">
+            Conexão com servidor perdida. Reconectando...
+          </span>
+        </motion.div>
+      )}
+
+      {/* Error message */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center gap-2"
+        >
+          <AlertTriangle className="w-4 h-4 text-destructive" />
+          <span className="text-sm text-destructive">{error}</span>
+        </motion.div>
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -72,12 +115,9 @@ export function WhatsAppConnectionPanel({
         {/* Header */}
         <div className="mb-6">
           <h2 className="text-xl font-semibold text-foreground">
-            Conectar {account.phone}{" "}
-            <span className="text-muted-foreground font-normal">
-              ({account.name})
-            </span>
+            {account.name}
           </h2>
-          <div className="flex items-center gap-4 mt-2">
+          <div className="flex items-center gap-4 mt-2 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Status:</span>
               <span className={cn("flex items-center gap-1.5 text-sm font-medium", status.color)}>
@@ -85,6 +125,11 @@ export function WhatsAppConnectionPanel({
                 {status.label}
               </span>
             </div>
+            {account.phone && (
+              <div className="text-sm text-muted-foreground">
+                {account.phone}
+              </div>
+            )}
             <div className="text-sm text-muted-foreground">
               Última conexão:{" "}
               {account.lastConnectedAt
@@ -102,10 +147,10 @@ export function WhatsAppConnectionPanel({
             </div>
             <div>
               <p className="font-medium text-foreground">
-                Conectar {account.phone}{" "}
-                <span className="text-muted-foreground font-normal">
-                  ({account.name})
-                </span>
+                Conectar WhatsApp
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Escaneie o código com seu celular
               </p>
             </div>
           </div>
@@ -114,15 +159,15 @@ export function WhatsAppConnectionPanel({
           <div className="space-y-2 mb-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Check className="w-4 h-4 text-whatsapp" />
-              <span>Abra o WhatsApp e escaneie o QR code abaixo</span>
+              <span>Abra o WhatsApp no celular</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Check className="w-4 h-4 text-whatsapp" />
-              <span>Mantenha seu celular conectado à internet</span>
+              <span>Vá em Configurações → Dispositivos conectados</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Check className="w-4 h-4 text-whatsapp" />
-              <span>Não feche o WhatsApp durante a conexão</span>
+              <span>Clique em "Conectar dispositivo" e escaneie</span>
             </div>
           </div>
 
@@ -136,8 +181,11 @@ export function WhatsAppConnectionPanel({
                     Gerando QR Code...
                   </span>
                 </div>
-              ) : qrCode ? (
-                <img
+              ) : qrCode && showQR ? (
+                <motion.img
+                  key={qrCode}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
                   src={qrCode}
                   alt="QR Code WhatsApp"
                   className="w-full h-full object-contain p-4"
@@ -151,11 +199,18 @@ export function WhatsAppConnectionPanel({
                     Conectado!
                   </span>
                 </div>
+              ) : account.status === "authenticating" ? (
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  <span className="text-sm text-primary font-medium">
+                    Autenticando...
+                  </span>
+                </div>
               ) : (
                 <div className="flex flex-col items-center gap-3 p-4">
                   <QrCode className="w-16 h-16 text-muted-foreground/30" />
                   <span className="text-sm text-muted-foreground text-center">
-                    Clique em "Conectar agora" para gerar o QR Code
+                    Clique em "Conectar" para gerar o QR Code
                   </span>
                 </div>
               )}
@@ -164,24 +219,37 @@ export function WhatsAppConnectionPanel({
 
           {/* Actions */}
           <div className="flex gap-3">
-            <Button
-              onClick={onConnect}
-              disabled={isLoading || account.status === "connected"}
-              className="flex-1 bg-whatsapp hover:bg-whatsapp/90 text-white"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Conectando...
-                </>
-              ) : (
-                "Conectar agora"
-              )}
-            </Button>
+            {canConnect ? (
+              <Button
+                onClick={onConnect}
+                disabled={isLoading || !isSocketConnected}
+                className="flex-1 bg-whatsapp hover:bg-whatsapp/90 text-white"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Iniciando...
+                  </>
+                ) : (
+                  "Conectar"
+                )}
+              </Button>
+            ) : account.status === 'connecting' || account.status === 'qr_ready' ? (
+              <Button
+                onClick={onConnect}
+                disabled={isLoading}
+                variant="outline"
+                className="flex-1"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Gerar novo QR
+              </Button>
+            ) : null}
+            
             <Button
               onClick={onDisconnect}
               variant="secondary"
-              disabled={account.status === "disconnected"}
+              disabled={!canDisconnect || isLoading}
               className="flex-1"
             >
               Desconectar

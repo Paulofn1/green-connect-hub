@@ -1,136 +1,315 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { WhatsAppAccountsList } from "@/components/whatsapp/WhatsAppAccountsList";
 import { WhatsAppConnectionPanel } from "@/components/whatsapp/WhatsAppConnectionPanel";
 import { WhatsAppConnectionLogs } from "@/components/whatsapp/WhatsAppConnectionLogs";
-import type { WhatsAppAccount, ConnectionLog } from "@/types/whatsapp";
-
-// Mock data - será substituído por dados reais do backend
-const mockAccounts: WhatsAppAccount[] = [
-  {
-    id: "1",
-    name: "Vendas",
-    phone: "+55 11 98765-4321",
-    status: "connected",
-    lastConnectedAt: new Date(),
-    botActive: true,
-  },
-  {
-    id: "2",
-    name: "Suporte",
-    phone: "+55 11 91234-5678",
-    status: "connecting",
-    lastConnectedAt: undefined,
-    botActive: false,
-  },
-  {
-    id: "3",
-    name: "Cobrança",
-    phone: "+55 11 99876-5432",
-    status: "disconnected",
-    lastConnectedAt: new Date(Date.now() - 86400000),
-    botActive: false,
-  },
-];
-
-const mockLogs: ConnectionLog[] = [
-  {
-    id: "1",
-    accountId: "2",
-    timestamp: new Date(),
-    message: "Nova sessão criada, gerando QR code...",
-    type: "info",
-  },
-  {
-    id: "2",
-    accountId: "2",
-    timestamp: new Date(),
-    message: "QR code renovado agora",
-    type: "success",
-  },
-  {
-    id: "3",
-    accountId: "2",
-    timestamp: new Date(Date.now() - 120000),
-    message: "Sessão expirada, desconectando...",
-    type: "warning",
-  },
-  {
-    id: "4",
-    accountId: "2",
-    timestamp: new Date(Date.now() - 120000),
-    message: "Sessão expirada",
-    type: "error",
-  },
-];
-
-// Mock QR Code placeholder (em produção viria do Baileys via WebSocket)
-const MOCK_QR_CODE = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiB2aWV3Qm94PSIwIDAgMjAwIDIwMCI+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiNmZmYiLz48ZyBmaWxsPSIjMDAwIj48cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIvPjxyZWN0IHg9IjE1MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIvPjxyZWN0IHg9IjEwIiB5PSIxNTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIvPjxyZWN0IHg9IjIwIiB5PSIyMCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMTYwIiB5PSIyMCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMjAiIHk9IjE2MCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iNjAiIHk9IjEwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiLz48cmVjdCB4PSI4MCIgeT0iMTAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIvPjxyZWN0IHg9IjcwIiB5PSI2MCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIi8+PHJlY3QgeD0iOTAiIHk9IjcwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiLz48cmVjdCB4PSI2MCIgeT0iMTAwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiLz48cmVjdCB4PSIxMzAiIHk9IjEwMCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIi8+PHJlY3QgeD0iNzAiIHk9IjEzMCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIi8+PHJlY3QgeD0iMTEwIiB5PSIxMzAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIvPjxyZWN0IHg9IjE1MCIgeT0iMTUwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiLz48cmVjdCB4PSIxNzAiIHk9IjE3MCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIi8+PHJlY3QgeD0iMTMwIiB5PSI2MCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjMwIi8+PC9nPjxjaXJjbGUgY3g9IjEwMCIgY3k9IjEwMCIgcj0iMTUiIGZpbGw9IiMyNWQ0NjYiLz48cGF0aCBkPSJNOTUgMTAwbDMgM2w3LTciIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIyIiBmaWxsPSJub25lIi8+PC9zdmc+";
+import { useWhatsAppSocket } from "@/hooks/useWhatsAppSocket";
+import { whatsappService } from "@/services/whatsappService";
+import { useToast } from "@/hooks/use-toast";
+import type { 
+  WhatsAppAccount, 
+  ConnectionLog, 
+  ConnectionStatusEvent,
+  QRCodeEvent,
+  LogEvent,
+  ErrorEvent,
+} from "@/types/whatsapp";
 
 export default function WhatsAppConnection() {
-  const [accounts, setAccounts] = useState<WhatsAppAccount[]>(mockAccounts);
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>("2");
-  const [logs, setLogs] = useState<ConnectionLog[]>(mockLogs);
-  const [isLoading, setIsLoading] = useState(false);
+  // Estado principal
+  const [accounts, setAccounts] = useState<WhatsAppAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [logs, setLogs] = useState<Record<string, ConnectionLog[]>>({});
+  const [qrCodes, setQrCodes] = useState<Record<string, string | null>>({});
+  
+  // Estados de loading
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
+  const [isLoadingAction, setIsLoadingAction] = useState(false);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  
+  // Estados de UI
   const [showLogs, setShowLogs] = useState(true);
-  const [qrCode, setQrCode] = useState<string | null>(MOCK_QR_CODE);
+  const [error, setError] = useState<string | null>(null);
+  
+  const { toast } = useToast();
 
-  const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || null;
-  const accountLogs = logs.filter((l) => l.accountId === selectedAccountId);
-
-  const handleAddAccount = useCallback(() => {
-    // TODO: Abrir modal para adicionar novo número
-    console.log("Adicionar novo número");
-  }, []);
-
-  const handleConnect = useCallback(() => {
-    if (!selectedAccountId) return;
-
-    setIsLoading(true);
-
-    // Simula conexão - em produção, isso viria do WebSocket com Baileys
-    setTimeout(() => {
-      setAccounts((prev) =>
-        prev.map((a) =>
-          a.id === selectedAccountId ? { ...a, status: "connecting" as const } : a
-        )
-      );
-
-      // Adiciona log
-      const newLog: ConnectionLog = {
-        id: Date.now().toString(),
-        accountId: selectedAccountId,
-        timestamp: new Date(),
-        message: "Nova sessão criada, gerando QR code...",
-        type: "info",
-      };
-      setLogs((prev) => [newLog, ...prev]);
-
-      setIsLoading(false);
-      setQrCode(MOCK_QR_CODE);
-    }, 1500);
-  }, [selectedAccountId]);
-
-  const handleDisconnect = useCallback(() => {
-    if (!selectedAccountId) return;
-
+  // Callbacks para eventos do WebSocket
+  const handleStatusChange = useCallback((event: ConnectionStatusEvent) => {
+    console.log('[Page] Status change:', event);
     setAccounts((prev) =>
       prev.map((a) =>
-        a.id === selectedAccountId ? { ...a, status: "disconnected" as const } : a
+        a.id === event.accountId
+          ? { 
+              ...a, 
+              status: event.status,
+              phone: event.phone || a.phone,
+              lastConnectedAt: event.status === 'connected' ? new Date().toISOString() : a.lastConnectedAt,
+            }
+          : a
       )
     );
-    setQrCode(null);
+    
+    // Limpa QR code quando conecta
+    if (event.status === 'connected') {
+      setQrCodes((prev) => ({ ...prev, [event.accountId]: null }));
+      toast({
+        title: "WhatsApp conectado!",
+        description: `O número ${event.phone || ''} foi conectado com sucesso.`,
+      });
+    }
+  }, [toast]);
 
-    const newLog: ConnectionLog = {
-      id: Date.now().toString(),
-      accountId: selectedAccountId,
-      timestamp: new Date(),
-      message: "Desconectado pelo usuário",
-      type: "warning",
+  const handleQRCode = useCallback((event: QRCodeEvent) => {
+    console.log('[Page] QR Code received for:', event.accountId);
+    setQrCodes((prev) => ({ ...prev, [event.accountId]: event.qrCode }));
+    
+    // Atualiza status para qr_ready
+    setAccounts((prev) =>
+      prev.map((a) =>
+        a.id === event.accountId ? { ...a, status: 'qr_ready' as const } : a
+      )
+    );
+  }, []);
+
+  const handleLog = useCallback((event: LogEvent) => {
+    console.log('[Page] Log received:', event);
+    setLogs((prev) => ({
+      ...prev,
+      [event.accountId]: [event.log, ...(prev[event.accountId] || [])].slice(0, 100), // Mantém últimos 100 logs
+    }));
+  }, []);
+
+  const handleError = useCallback((event: ErrorEvent) => {
+    console.error('[Page] Error:', event);
+    setError(event.message);
+    toast({
+      variant: "destructive",
+      title: "Erro",
+      description: event.message,
+    });
+    
+    // Limpa erro após 5s
+    setTimeout(() => setError(null), 5000);
+  }, [toast]);
+
+  const handleConnected = useCallback((event: ConnectionStatusEvent) => {
+    console.log('[Page] WhatsApp connected:', event);
+    handleStatusChange(event);
+  }, [handleStatusChange]);
+
+  const handleDisconnected = useCallback((event: ConnectionStatusEvent) => {
+    console.log('[Page] WhatsApp disconnected:', event);
+    handleStatusChange(event);
+    toast({
+      variant: "destructive",
+      title: "WhatsApp desconectado",
+      description: "A sessão foi encerrada.",
+    });
+  }, [handleStatusChange, toast]);
+
+  // Hook do WebSocket
+  const { 
+    isConnected: isSocketConnected, 
+    joinAccountRoom, 
+    leaveAccountRoom,
+  } = useWhatsAppSocket({
+    onStatusChange: handleStatusChange,
+    onQRCode: handleQRCode,
+    onLog: handleLog,
+    onError: handleError,
+    onConnected: handleConnected,
+    onDisconnected: handleDisconnected,
+    autoConnect: true,
+  });
+
+  // Derivações
+  const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || null;
+  const accountLogs = selectedAccountId ? (logs[selectedAccountId] || []) : [];
+  const currentQRCode = selectedAccountId ? qrCodes[selectedAccountId] : null;
+
+  // Carrega contas ao montar
+  const fetchAccounts = useCallback(async () => {
+    setIsLoadingAccounts(true);
+    setError(null);
+    
+    try {
+      const data = await whatsappService.getAccounts();
+      setAccounts(data);
+      
+      // Seleciona a primeira conta se nenhuma estiver selecionada
+      if (data.length > 0 && !selectedAccountId) {
+        setSelectedAccountId(data[0].id);
+      }
+    } catch (err) {
+      console.error('[Page] Error fetching accounts:', err);
+      const message = err instanceof Error ? err.message : 'Erro ao carregar contas';
+      setError(message);
+      toast({
+        variant: "destructive",
+        title: "Erro ao carregar",
+        description: message,
+      });
+    } finally {
+      setIsLoadingAccounts(false);
+    }
+  }, [selectedAccountId, toast]);
+
+  // Carrega logs quando seleciona uma conta
+  const fetchLogs = useCallback(async (accountId: string) => {
+    if (logs[accountId]?.length > 0) return; // Já tem logs carregados
+    
+    setIsLoadingLogs(true);
+    try {
+      const data = await whatsappService.getConnectionLogs(accountId);
+      setLogs((prev) => ({ ...prev, [accountId]: data }));
+    } catch (err) {
+      console.error('[Page] Error fetching logs:', err);
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  }, [logs]);
+
+  // Efeito para carregar contas
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
+
+  // Efeito para entrar na room da conta selecionada e carregar logs
+  useEffect(() => {
+    if (selectedAccountId && isSocketConnected) {
+      joinAccountRoom(selectedAccountId);
+      fetchLogs(selectedAccountId);
+    }
+    
+    return () => {
+      if (selectedAccountId && isSocketConnected) {
+        leaveAccountRoom(selectedAccountId);
+      }
     };
-    setLogs((prev) => [newLog, ...prev]);
-  }, [selectedAccountId]);
+  }, [selectedAccountId, isSocketConnected, joinAccountRoom, leaveAccountRoom, fetchLogs]);
+
+  // Handlers de ações
+  const handleAddAccount = useCallback(async () => {
+    // TODO: Abrir modal para adicionar novo número
+    const name = prompt('Nome do número (ex: Vendas, Suporte):');
+    if (!name) return;
+    
+    setIsLoadingAction(true);
+    try {
+      const newAccount = await whatsappService.createAccount({ name });
+      setAccounts((prev) => [...prev, newAccount]);
+      setSelectedAccountId(newAccount.id);
+      toast({
+        title: "Número criado",
+        description: `"${name}" foi adicionado. Conecte agora!`,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao criar número';
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: message,
+      });
+    } finally {
+      setIsLoadingAction(false);
+    }
+  }, [toast]);
+
+  const handleConnect = useCallback(async () => {
+    if (!selectedAccountId) return;
+    
+    setIsLoadingAction(true);
+    setError(null);
+    
+    try {
+      // Atualiza status local imediatamente
+      setAccounts((prev) =>
+        prev.map((a) =>
+          a.id === selectedAccountId ? { ...a, status: 'connecting' as const } : a
+        )
+      );
+      
+      await whatsappService.connect(selectedAccountId);
+      
+      // Adiciona log local
+      const log: ConnectionLog = {
+        id: Date.now().toString(),
+        accountId: selectedAccountId,
+        timestamp: new Date().toISOString(),
+        message: 'Iniciando conexão, gerando QR Code...',
+        type: 'info',
+      };
+      setLogs((prev) => ({
+        ...prev,
+        [selectedAccountId]: [log, ...(prev[selectedAccountId] || [])],
+      }));
+      
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao conectar';
+      setError(message);
+      
+      // Reverte status
+      setAccounts((prev) =>
+        prev.map((a) =>
+          a.id === selectedAccountId ? { ...a, status: 'disconnected' as const } : a
+        )
+      );
+      
+      toast({
+        variant: "destructive",
+        title: "Erro ao conectar",
+        description: message,
+      });
+    } finally {
+      setIsLoadingAction(false);
+    }
+  }, [selectedAccountId, toast]);
+
+  const handleDisconnect = useCallback(async () => {
+    if (!selectedAccountId) return;
+    
+    setIsLoadingAction(true);
+    
+    try {
+      await whatsappService.disconnect(selectedAccountId);
+      
+      // Atualiza estado local
+      setAccounts((prev) =>
+        prev.map((a) =>
+          a.id === selectedAccountId ? { ...a, status: 'disconnected' as const } : a
+        )
+      );
+      setQrCodes((prev) => ({ ...prev, [selectedAccountId]: null }));
+      
+      // Adiciona log local
+      const log: ConnectionLog = {
+        id: Date.now().toString(),
+        accountId: selectedAccountId,
+        timestamp: new Date().toISOString(),
+        message: 'Desconectado pelo usuário',
+        type: 'warning',
+      };
+      setLogs((prev) => ({
+        ...prev,
+        [selectedAccountId]: [log, ...(prev[selectedAccountId] || [])],
+      }));
+      
+      toast({
+        title: "Desconectado",
+        description: "A sessão foi encerrada.",
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao desconectar';
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: message,
+      });
+    } finally {
+      setIsLoadingAction(false);
+    }
+  }, [selectedAccountId, toast]);
 
   return (
     <MainLayout title="Conexão WhatsApp">
@@ -145,15 +324,19 @@ export default function WhatsAppConnection() {
           selectedAccountId={selectedAccountId}
           onSelectAccount={setSelectedAccountId}
           onAddAccount={handleAddAccount}
+          isLoading={isLoadingAccounts}
+          onRefresh={fetchAccounts}
         />
 
         {/* Center Panel - Connection */}
         <WhatsAppConnectionPanel
           account={selectedAccount}
-          qrCode={qrCode}
+          qrCode={currentQRCode}
           onConnect={handleConnect}
           onDisconnect={handleDisconnect}
-          isLoading={isLoading}
+          isLoading={isLoadingAction}
+          isSocketConnected={isSocketConnected}
+          error={error}
         />
 
         {/* Right Panel - Logs */}
@@ -161,6 +344,7 @@ export default function WhatsAppConnection() {
           <WhatsAppConnectionLogs
             logs={accountLogs}
             onClose={() => setShowLogs(false)}
+            isLoading={isLoadingLogs}
           />
         )}
       </motion.div>
